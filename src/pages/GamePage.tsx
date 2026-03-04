@@ -185,6 +185,16 @@ export function GamePage({ roomId }: GamePageProps) {
     setDrawAccepted(false);
     setResignedColor(null);
   }, [resetGame, resetTimer]);
+
+  const handleRemoteState = useCallback((state: { gameState: any; settings: MatchSettingsType }) => {
+    loadFromFenAndHistory(
+      state.gameState.fen,
+      state.gameState.moveHistory,
+      state.gameState.capturedPieces
+    );
+    setSettings(state.settings);
+  }, [loadFromFenAndHistory]);
+
   const {
     isConnected,
     syncMove,
@@ -192,7 +202,8 @@ export function GamePage({ roomId }: GamePageProps) {
     syncResign,
     syncDrawOffer,
     syncDrawAccept,
-    syncRematch
+    syncRematch,
+    syncState
   } = useRealTimeSync({
     roomId,
     playerColor,
@@ -202,8 +213,16 @@ export function GamePage({ roomId }: GamePageProps) {
     onRemoteResign: handleRemoteResign,
     onRemoteDrawOffer: handleRemoteDrawOffer,
     onRemoteDrawAccept: handleRemoteDrawAccept,
-    onRemoteRematch: handleRemoteRematch
+    onRemoteRematch: handleRemoteRematch,
+    onRemoteState: handleRemoteState
   });
+
+  // White player broadcasts state when a new player joins
+  useEffect(() => {
+    if (playerColor === 'w' && connectedPlayers === 2) {
+      syncState(gameState, settings);
+    }
+  }, [connectedPlayers]);
   // Save game state
   useEffect(() => {
     saveGameToStorage(roomId, {
@@ -320,7 +339,7 @@ export function GamePage({ roomId }: GamePageProps) {
     syncRematch();
   }, [resetGame, resetTimer, syncRematch]);
   const handleCopyLink = useCallback(async () => {
-    const url = getRoomUrl(roomId);
+    const url = getRoomUrl(roomId, 'b');
     try {
       await navigator.clipboard.writeText(url);
       setLinkCopied(true);
@@ -406,7 +425,7 @@ export function GamePage({ roomId }: GamePageProps) {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/60 hover:bg-amber-600/60 rounded-lg text-xs text-amber-200 font-medium transition-colors">
 
               {linkCopied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
-              <span className="hidden sm:block">{getRoomUrl(roomId)}</span>
+              <span className="hidden sm:block">{getRoomUrl(roomId, 'b')}</span>
               <span className="sm:hidden">Copy</span>
             </button>
           </div>
@@ -426,10 +445,10 @@ export function GamePage({ roomId }: GamePageProps) {
               <h3 className="text-xl font-bold text-white mb-2">Scan to Join</h3>
               <p className="text-gray-400 text-sm mb-6">Point your camera at this code to join the match</p>
               <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
-                <QRCodeSVG value={getRoomUrl(roomId)} size={200} level="H" />
+                <QRCodeSVG value={getRoomUrl(roomId, 'b')} size={200} level="H" />
               </div>
               <div className="mt-6 p-3 bg-gray-800 rounded-xl border border-gray-700">
-                <p className="text-xs text-gray-400 break-all">{getRoomUrl(roomId)}</p>
+                <p className="text-xs text-gray-400 break-all">{getRoomUrl(roomId, 'b')}</p>
               </div>
             </div>
           </div>

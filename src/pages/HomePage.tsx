@@ -34,7 +34,8 @@ export function HomePage() {
   const [copied, setCopied] = useState(false);
   const handleCreateMatch = () => {
     const roomId = generateRoomId();
-    const url = getRoomUrl(roomId);
+    // Creator plays as White
+    const url = getRoomUrl(roomId, 'w');
     // Store initial settings preference
     localStorage.setItem(
       `chesslink_prefs`,

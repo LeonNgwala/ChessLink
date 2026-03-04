@@ -12,9 +12,11 @@ export function generateRoomId(): string {
   return result;
 }
 
-export function getRoomUrl(roomId: string): string {
+export function getRoomUrl(roomId: string, color?: 'w' | 'b'): string {
   const base = window.location.origin + window.location.pathname;
-  return `${base}?room=${roomId}`;
+  let url = `${base}?room=${roomId}`;
+  if (color) url += `&color=${color}`;
+  return url;
 }
 
 export function parseRoomFromUrl(): string | null {
@@ -22,25 +24,29 @@ export function parseRoomFromUrl(): string | null {
   return params.get('room');
 }
 
+export function parseColorFromUrl(): 'w' | 'b' | null {
+  const params = new URLSearchParams(window.location.search);
+  const color = params.get('color');
+  return color === 'w' || color === 'b' ? color : null;
+}
+
 export function getPlayerColor(roomId: string): 'w' | 'b' {
+  // 1. Check URL first (important for shared links)
+  const urlColor = parseColorFromUrl();
+  if (urlColor) {
+    const key = `${PLAYER_COLOR_PREFIX}${roomId}`;
+    localStorage.setItem(key, urlColor);
+    return urlColor;
+  }
+
+  // 2. Check local storage
   const key = `${PLAYER_COLOR_PREFIX}${roomId}`;
   const stored = localStorage.getItem(key);
   if (stored === 'w' || stored === 'b') return stored;
 
-  // Check if white is already taken
-  const whiteKey = `${PLAYER_COLOR_PREFIX}${roomId}_white_taken`;
-  const whiteTaken = localStorage.getItem(whiteKey);
-
-  if (!whiteTaken) {
-    // First player gets white
-    localStorage.setItem(key, 'w');
-    localStorage.setItem(whiteKey, 'true');
-    return 'w';
-  } else {
-    // Second player gets black
-    localStorage.setItem(key, 'b');
-    return 'b';
-  }
+  // 3. Fallback (default to white for creator if no color specified)
+  localStorage.setItem(key, 'w');
+  return 'w';
 }
 
 export function saveGameToStorage(
