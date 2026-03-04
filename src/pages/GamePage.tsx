@@ -20,8 +20,11 @@ import {
   CheckIcon,
   Users2Icon,
   ArrowLeftIcon,
-  RotateCcwIcon } from
+  RotateCcwIcon,
+  QrCodeIcon,
+  XIcon } from
 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 interface GamePageProps {
   roomId: string;
 }
@@ -66,6 +69,7 @@ export function GamePage({ roomId }: GamePageProps) {
   const [resignedColor, setResignedColor] = useState<PieceColor | null>(null);
   const [drawOffered, setDrawOffered] = useState(false);
   const [drawAccepted, setDrawAccepted] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const {
     gameState,
     makeMove,
@@ -362,6 +366,12 @@ export function GamePage({ roomId }: GamePageProps) {
             {roomId}
           </span>
           <button
+            onClick={() => setQrOpen(true)}
+            className="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-gray-300 hover:text-white transition-all"
+            title="Show QR Code">
+            <QrCodeIcon size={16} />
+          </button>
+          <button
             onClick={handleCopyLink}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-amber-600/50 rounded-lg text-xs text-gray-300 hover:text-white transition-all">
 
@@ -381,17 +391,48 @@ export function GamePage({ roomId }: GamePageProps) {
           <div className="flex items-center gap-2">
             <Users2Icon size={15} className="text-amber-400" />
             <span className="text-sm text-amber-300">
-              Share this link to invite your opponent
+              Share this link or QR code to invite your opponent
             </span>
           </div>
-          <button
-          onClick={handleCopyLink}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/60 hover:bg-amber-600/60 rounded-lg text-xs text-amber-200 font-medium transition-colors">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setQrOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/60 hover:bg-amber-600/60 rounded-lg text-xs text-amber-200 font-medium transition-colors">
+              <QrCodeIcon size={12} />
+              <span>QR Code</span>
+            </button>
+            <button
+            onClick={handleCopyLink}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/60 hover:bg-amber-600/60 rounded-lg text-xs text-amber-200 font-medium transition-colors">
 
-            {linkCopied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
-            <span className="hidden sm:block">{getRoomUrl(roomId)}</span>
-            <span className="sm:hidden">Copy</span>
-          </button>
+              {linkCopied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
+              <span className="hidden sm:block">{getRoomUrl(roomId)}</span>
+              <span className="sm:hidden">Copy</span>
+            </button>
+          </div>
+        </div>
+      }
+
+      {/* QR Code Modal */}
+      {qrOpen &&
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setQrOpen(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-sm w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setQrOpen(false)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+              <XIcon size={20} />
+            </button>
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-white mb-2">Scan to Join</h3>
+              <p className="text-gray-400 text-sm mb-6">Point your camera at this code to join the match</p>
+              <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
+                <QRCodeSVG value={getRoomUrl(roomId)} size={200} level="H" />
+              </div>
+              <div className="mt-6 p-3 bg-gray-800 rounded-xl border border-gray-700">
+                <p className="text-xs text-gray-400 break-all">{getRoomUrl(roomId)}</p>
+              </div>
+            </div>
+          </div>
         </div>
       }
 
