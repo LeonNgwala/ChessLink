@@ -82,35 +82,72 @@ export function useRealTimeSync({
 
     const peerId = `chesslink_${roomId}_${playerColor}`;
     const opponentId = `chesslink_${roomId}_${playerColor === 'w' ? 'b' : 'w'}`;
+    let retryTimeout: number | null = null;
+    let isDestroyed = false;
 
-    const peer = new Peer(peerId);
+    const peer = new Peer(peerId, {
+      debug: 1 // Only show errors
+    });
     peerRef.current = peer;
+
+    const connectToOpponent = () => {
+      if (isDestroyed || connectionRef.current?.open) return;
+      
+      // Only 'b' initiates to avoid double connection issues, 
+      // but we could make it more robust.
+      if (playerColor === 'b') {
+        const conn = peer.connect(opponentId, {
+          reliable: true
+        });
+        setupConnection(conn);
+      }
+    };
 
     peer.on('open', () => {
       setIsConnected(true);
-      if (playerColor === 'b') {
-        const conn = peer.connect(opponentId);
-        setupConnection(conn);
-      }
+      connectToOpponent();
     });
 
     peer.on('connection', (conn) => {
+      // If we already have an active connection, don't replace it unless the new one is newer
+      if (connectionRef.current?.open) {
+        return;
+      }
       setupConnection(conn);
     });
 
     peer.on('error', (err) => {
-      console.warn('PeerJS error:', err);
-      setupBroadcastChannel();
+      if (isDestroyed) return;
+      
+      if (err.type === 'peer-unavailable') {
+        // Opponent not online yet, retry later
+        retryTimeout = window.setTimeout(() => {
+          connectToOpponent();
+        }, 3000);
+      } else if (err.type === 'unavailable-id') {
+        // ID already taken - this happens if two tabs are open as the same player
+        console.error('PeerJS ID already taken. Please close other tabs.');
+        setIsConnected(false);
+      } else {
+        console.warn('PeerJS error:', err.type, err);
+        setupBroadcastChannel();
+      }
     });
 
     function setupConnection(conn: DataConnection) {
+      if (connectionRef.current === conn) return;
       connectionRef.current = conn;
       
       conn.on('open', () => {
         setConnectedPlayers(2);
         onPlayerCountChange(2);
-        // White will usually send the current state when Black connects
-        conn.send({ type: 'join', payload: {}, senderId: peerId, timestamp: Date.now() });
+        // Notify the other side we've joined
+        conn.send({ 
+          type: 'join', 
+          payload: {}, 
+          senderId: peerId, 
+          timestamp: Date.now() 
+        });
       });
 
       conn.on('data', (data: any) => {
@@ -118,9 +155,17 @@ export function useRealTimeSync({
       });
 
       conn.on('close', () => {
+        if (isDestroyed) return;
         setConnectedPlayers(1);
         onPlayerCountChange(1);
         connectionRef.current = null;
+        // Try to reconnect
+        retryTimeout = window.setTimeout(connectToOpponent, 3000);
+      });
+
+      conn.on('error', (err) => {
+        console.error('Connection error:', err);
+        conn.close();
       });
     }
 
@@ -132,6 +177,8 @@ export function useRealTimeSync({
     }
 
     return () => {
+      isDestroyed = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
       peer.destroy();
       broadcastChannelRef.current?.close();
     };

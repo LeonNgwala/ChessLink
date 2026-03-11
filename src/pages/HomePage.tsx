@@ -52,20 +52,30 @@ export function HomePage() {
       setJoinError('Please enter a room link or ID');
       return;
     }
+    
     let roomId = input;
+    let color: 'w' | 'b' | undefined = undefined;
+    
     // Try to parse as URL
     try {
-      const url = new URL(input);
-      const room = url.searchParams.get('room');
-      if (room) roomId = room;
-    } catch {
+      if (input.includes('http') || input.includes('?room=')) {
+        const url = new URL(input.startsWith('http') ? input : window.location.origin + '/' + input);
+        const room = url.searchParams.get('room');
+        const c = url.searchParams.get('color');
+        if (room) roomId = room;
+        if (c === 'w' || c === 'b') color = c;
+      }
+    } catch (e) {
+      // Not a URL or invalid URL, treat as room ID directly
+    }
 
-      // Not a URL, treat as room ID directly
-    }if (roomId.length < 4) {
+    if (roomId.length < 4) {
       setJoinError('Invalid room ID');
       return;
     }
-    window.location.href = getRoomUrl(roomId);
+    
+    // If no color specified, default to 'b' for someone joining
+    window.location.href = getRoomUrl(roomId, color || 'b');
   };
   return (
     <div className="min-h-screen w-full bg-gray-950 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">

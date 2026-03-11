@@ -218,11 +218,15 @@ export function GamePage({ roomId }: GamePageProps) {
   });
 
   // White player broadcasts state when a new player joins
+  const hasInitialSync = useRef(false);
   useEffect(() => {
-    if (playerColor === 'w' && connectedPlayers === 2) {
+    if (playerColor === 'w' && connectedPlayers === 2 && !hasInitialSync.current && isConnected) {
       syncState(gameState, settings);
+      hasInitialSync.current = true;
+    } else if (connectedPlayers < 2) {
+      hasInitialSync.current = false;
     }
-  }, [connectedPlayers]);
+  }, [connectedPlayers, playerColor, isConnected, syncState, gameState, settings]);
   // Save game state
   useEffect(() => {
     saveGameToStorage(roomId, {
