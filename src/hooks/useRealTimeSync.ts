@@ -85,17 +85,23 @@ export function useRealTimeSync({
     let retryTimeout: number | null = null;
     let isDestroyed = false;
 
+    console.log(`[P2P] Initializing Peer with ID: ${peerId}`);
     const peer = new Peer(peerId, {
-      debug: 1 // Only show errors
+      debug: 2, // Log errors and warnings
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ]
+      }
     });
     peerRef.current = peer;
 
     const connectToOpponent = () => {
       if (isDestroyed || connectionRef.current?.open) return;
       
-      // Only 'b' initiates to avoid double connection issues, 
-      // but we could make it more robust.
       if (playerColor === 'b') {
+        console.log(`[P2P] Attempting to connect to opponent: ${opponentId}`);
         const conn = peer.connect(opponentId, {
           reliable: true
         });
@@ -103,14 +109,16 @@ export function useRealTimeSync({
       }
     };
 
-    peer.on('open', () => {
+    peer.on('open', (id) => {
+      console.log(`[P2P] Peer server connection opened. My ID: ${id}`);
       setIsConnected(true);
       connectToOpponent();
     });
 
     peer.on('connection', (conn) => {
-      // If we already have an active connection, don't replace it unless the new one is newer
+      console.log(`[P2P] Incoming connection from: ${conn.peer}`);
       if (connectionRef.current?.open) {
+        console.log(`[P2P] Already have an active connection, ignoring new one`);
         return;
       }
       setupConnection(conn);
@@ -118,18 +126,16 @@ export function useRealTimeSync({
 
     peer.on('error', (err) => {
       if (isDestroyed) return;
+      console.error(`[P2P] Peer error: ${err.type}`, err);
       
       if (err.type === 'peer-unavailable') {
-        // Opponent not online yet, retry later
+        console.log(`[P2P] Opponent ${opponentId} not found, retrying in 3s...`);
         retryTimeout = window.setTimeout(() => {
           connectToOpponent();
         }, 3000);
       } else if (err.type === 'unavailable-id') {
-        // ID already taken - this happens if two tabs are open as the same player
-        console.error('PeerJS ID already taken. Please close other tabs.');
         setIsConnected(false);
       } else {
-        console.warn('PeerJS error:', err.type, err);
         setupBroadcastChannel();
       }
     });
@@ -139,9 +145,9 @@ export function useRealTimeSync({
       connectionRef.current = conn;
       
       conn.on('open', () => {
+        console.log(`[P2P] Data connection established with: ${conn.peer}`);
         setConnectedPlayers(2);
         onPlayerCountChange(2);
-        // Notify the other side we've joined
         conn.send({ 
           type: 'join', 
           payload: {}, 
@@ -151,15 +157,16 @@ export function useRealTimeSync({
       });
 
       conn.on('data', (data: any) => {
+        console.log(`[P2P] Message received:`, data.type);
         handleIncomingMessage(data as BroadcastMessage);
       });
 
       conn.on('close', () => {
+        console.log(`[P2P] Connection closed`);
         if (isDestroyed) return;
         setConnectedPlayers(1);
         onPlayerCountChange(1);
         connectionRef.current = null;
-        // Try to reconnect
         retryTimeout = window.setTimeout(connectToOpponent, 3000);
       });
 
